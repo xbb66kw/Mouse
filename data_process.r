@@ -693,7 +693,7 @@ for (i in good_neurons) {
     
     
     #For neuron i, trials with shape. If there's no such nerrons, we might just ignore this neuron i.
-    quality_trials <- positive_set[which(sd_results_positive >= mean(sd_results_positive) + 0.5 * sd(sd_results_positive))]
+    quality_trials <- positive_set[which(sd_results_positive >= mean(sd_results_positive) + 0.1 * sd(sd_results_positive))]
     
     no_quality_trials <- mid_$trials[mid_$relative == 0 & !is.na(mid_$relative)]
     
@@ -722,9 +722,80 @@ for (i in good_neurons) {
 }
 
 ###
-###
+###Positive parameter tunning
+d_ <- b_ - a_
+#i <- 39
+ms_results_positive <- c()
+for (i in good_neurons) { 
+    ms_matching <- rep(NA, d_)
+    matching_neuron_trials <- vector('list', d_)
+    
+    #tunning_trials_touching_records <- rq_series(i, (a_ + 1):(a_ + d_))$touch
+    mid_ <- rq_series(i, 1:a_)
+    touching_records <- mid_$touch
+    predicted_records <- mid_$relative
+    
+    
+    #Quality trials!
+    quality_trials <- c()
+    ambiguous_trials <- c()
+    
+    positive_set <- which(touching_records == predicted_records & (predicted_records == 1))
+    sd_results_positive <- rep(0, length(positive_set))
+    j <- 1
+    
+    for (t_ in which(touching_records == predicted_records & (predicted_records == 1))) {
+        #5:25 data for variance evaluation
+        sd_results_positive[j] <- sd(series_maker(i, t_)$trials_v[5:25])
+        j <- j + 1
+    }
+    
+    
+    
+    #For neuron i, trials with shape. If there's no such nerrons, we might just ignore this neuron i.
+    quality_trials <- positive_set[which(sd_results_positive >= mean(sd_results_positive) + 0.1 * sd(sd_results_positive))]
+    
+    no_quality_trials <- mid_$trials[mid_$relative == 0 & !is.na(mid_$relative)]
+    
+    aimed_trials <- c(quality_trials, no_quality_trials) 
+    
+    focusing_set <- rep(0, a_)
+    focusing_set[quality_trials] <- 1
+    
+    for (j in 1:d_) {
+        
+    
+        ms_results <- ms_prediction(i, (j + a_), training_data=aimed_trials)
+        if (any(is.na(ms_results[[4]]))) {next;}
+        matching_trials <- ms_results[[3]][which(ms_results[[4]][[2]] == 1)]
+    
+        matching_trials_enumeration <- inverse_valid_trials(matching_trials)
+        
+        
+        matching_neuron_trials[[j]] <- matching_trials_enumeration
+    
+        
+        #This compare to the recoreded touching reuslts for trials in 61 to 80.
+        ms_matching[j] <- (sum(focusing_set[matching_trials_enumeration]) > 0)
+    }
+    ms_results_positive <- cbind(ms_results_positive, ms_matching)
+}
+
+
+para_ <- seq(0.2, 0.8, by=0.05)
+y_mid <- rq_series(1, (a_+1):b_)$touch
+results_mid <- rep(0, length(para_))
+s_ <- 1
+
+for (para in para_) {
+    mid_ <- rowSums(ms_results_positive) >= (length(ms_results_positive[1,]) * para)
+    results_mid[s_] <- mean(y_mid[mid_], na.rm=TRUE)
+    s_ <- s_ + 1
+}
+
 #These are going to be positive prediction
-prediction_aux_information <- rowSums(ms_results_) >= (length(ms_results_[1,]) / 2)
+para_positive <- para_[which(max(results_mid) == results_mid)[1]]
+prediction_aux_information <- rowSums(ms_results_) >= (length(ms_results_[1,]) * para_positive)
 
 
 
